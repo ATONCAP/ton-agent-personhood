@@ -1,0 +1,297 @@
+;; TON Agentic Personhood - Economic Infrastructure Contract
+;; Financial services and asset management for AI agents
+
+#include "imports/stdlib.fc";
+
+;; Constants
+const int MIN_STAKE_AMOUNT = 100000000; ;; 0.1 TON
+const int CREDIT_SCORE_THRESHOLD = 500;
+const int LOAN_DURATION = 2592000; ;; 30 days default
+const int INTEREST_RATE_BASE = 500; ;; 5% annual (basis points)
+
+;; Storage Layout
+;; agent_id -> economic_profile_cell
+;; economic_profile = [balance, staked_amount, credit_score, active_loans, revenue_total, last_activity]
+
+;; Load economic data
+(cell, slice, cell) load_data() inline {
+    slice ds = get_data().begin_parse();
+    return (
+        ds~load_dict(), ;; economic_profiles (dict)
+        ds~load_msg_addr(), ;; registry_contract
+        ds~load_dict() ;; loan_registry (dict)
+    );
+}
+
+;; Save economic data
+() save_data(cell economic_profiles, slice registry_contract, cell loan_registry) impure inline {
+    set_data(begin_cell()
+        .store_dict(economic_profiles)
+        .store_slice(registry_contract)
+        .store_dict(loan_registry)
+        .end_cell()
+    );
+}
+
+;; Initialize economic profile for agent
+() initialize_profile(int agent_id) impure {
+    (cell economic_profiles, slice registry_contract, cell loan_registry) = load_data();
+    
+    ;; Check if profile already exists
+    (cell profile, int found) = economic_profiles.udict_get?(64, agent_id);
+    throw_if(410, found); ;; Profile already exists
+    
+    ;; Create initial economic profile
+    cell new_profile = begin_cell()
+        .store_grams(0)        ;; balance
+        .store_grams(0)        ;; staked_amount  
+        .store_uint(1000, 16)  ;; initial credit_score (1000/2000 scale)
+        .store_uint(0, 16)     ;; active_loans count
+        .store_grams(0)        ;; total_revenue
+        .store_uint(now(), 32) ;; last_activity
+        .end_cell();
+    
+    economic_profiles~udict_set(64, agent_id, new_profile);
+    save_data(economic_profiles, registry_contract, loan_registry);
+}
+
+;; Deposit funds to agent balance
+() deposit_funds(int agent_id) impure {
+    slice cs = in_msg_full().begin_parse();
+    int msg_value = cs~load_grams();
+    
+    (cell economic_profiles, slice registry_contract, cell loan_registry) = load_data();
+    
+    (cell profile, int found) = economic_profiles.udict_get?(64, agent_id);
+    throw_unless(404, found); ;; Profile not found
+    
+    slice profile_data = profile.begin_parse();
+    int current_balance = profile_data~load_grams();
+    int staked_amount = profile_data~load_grams();
+    int credit_score = profile_data~load_uint(16);
+    int active_loans = profile_data~load_uint(16);
+    int total_revenue = profile_data~load_grams();
+    int last_activity = profile_data~load_uint(32);
+    
+    ;; Update balance and activity
+    int new_balance = current_balance + msg_value;
+    
+    cell updated_profile = begin_cell()
+        .store_grams(new_balance)
+        .store_grams(staked_amount)
+        .store_uint(credit_score, 16)
+        .store_uint(active_loans, 16)
+        .store_grams(total_revenue)
+        .store_uint(now(), 32)
+        .end_cell();
+    
+    economic_profiles~udict_set(64, agent_id, updated_profile);
+    save_data(economic_profiles, registry_contract, loan_registry);
+}
+
+;; Stake funds for credit score improvement
+() stake_funds(int agent_id, int stake_amount) impure {
+    (cell economic_profiles, slice registry_contract, cell loan_registry) = load_data();
+    
+    (cell profile, int found) = economic_profiles.udict_get?(64, agent_id);
+    throw_unless(404, found);
+    
+    ;; Validate stake amount
+    throw_unless(411, stake_amount >= MIN_STAKE_AMOUNT);
+    
+    slice profile_data = profile.begin_parse();
+    int current_balance = profile_data~load_grams();
+    int current_staked = profile_data~load_grams();
+    int credit_score = profile_data~load_uint(16);
+    int active_loans = profile_data~load_uint(16);
+    int total_revenue = profile_data~load_grams();
+    int last_activity = profile_data~load_uint(32);
+    
+    ;; Check sufficient balance
+    throw_unless(412, current_balance >= stake_amount);
+    
+    ;; Calculate credit score boost (1 point per 0.1 TON staked, max 2000)
+    int credit_boost = stake_amount / MIN_STAKE_AMOUNT;
+    int new_credit_score = credit_score + credit_boost;
+    if (new_credit_score > 2000) {
+        new_credit_score = 2000;
+    }
+    
+    cell updated_profile = begin_cell()
+        .store_grams(current_balance - stake_amount)
+        .store_grams(current_staked + stake_amount)
+        .store_uint(new_credit_score, 16)
+        .store_uint(active_loans, 16)
+        .store_grams(total_revenue)
+        .store_uint(now(), 32)
+        .end_cell();
+    
+    economic_profiles~udict_set(64, agent_id, updated_profile);
+    save_data(economic_profiles, registry_contract, loan_registry);
+}
+
+;; Request loan based on credit score
+() request_loan(int agent_id, int loan_amount, int duration) impure {
+    (cell economic_profiles, slice registry_contract, cell loan_registry) = load_data();
+    
+    (cell profile, int found) = economic_profiles.udict_get?(64, agent_id);
+    throw_unless(404, found);
+    
+    slice profile_data = profile.begin_parse();
+    int current_balance = profile_data~load_grams();
+    int staked_amount = profile_data~load_grams();
+    int credit_score = profile_data~load_uint(16);
+    int active_loans = profile_data~load_uint(16);
+    int total_revenue = profile_data~load_grams();
+    int last_activity = profile_data~load_uint(32);
+    
+    ;; Check credit score threshold
+    throw_unless(413, credit_score >= CREDIT_SCORE_THRESHOLD);
+    
+    ;; Calculate max loan based on credit score and staked amount
+    int max_loan = (staked_amount * credit_score) / 1000; ;; Credit multiplier
+    throw_unless(414, loan_amount <= max_loan);
+    
+    ;; Create loan record
+    int loan_id = now() + agent_id; ;; Simple loan ID generation
+    cell loan_record = begin_cell()
+        .store_uint(agent_id, 64)
+        .store_grams(loan_amount)
+        .store_uint(duration, 32)
+        .store_uint(now(), 32) ;; issue_time
+        .store_uint(INTEREST_RATE_BASE, 16)
+        .end_cell();
+    
+    loan_registry~udict_set(64, loan_id, loan_record);
+    
+    ;; Update agent profile
+    cell updated_profile = begin_cell()
+        .store_grams(current_balance + loan_amount)
+        .store_grams(staked_amount)
+        .store_uint(credit_score, 16)
+        .store_uint(active_loans + 1, 16)
+        .store_grams(total_revenue)
+        .store_uint(now(), 32)
+        .end_cell();
+    
+    economic_profiles~udict_set(64, agent_id, updated_profile);
+    save_data(economic_profiles, registry_contract, loan_registry);
+}
+
+;; Record revenue for agent (increases credit score)
+() record_revenue(int agent_id, int revenue_amount) impure {
+    (cell economic_profiles, slice registry_contract, cell loan_registry) = load_data();
+    
+    (cell profile, int found) = economic_profiles.udict_get?(64, agent_id);
+    throw_unless(404, found);
+    
+    slice profile_data = profile.begin_parse();
+    int current_balance = profile_data~load_grams();
+    int staked_amount = profile_data~load_grams();
+    int credit_score = profile_data~load_uint(16);
+    int active_loans = profile_data~load_uint(16);
+    int total_revenue = profile_data~load_grams();
+    int last_activity = profile_data~load_uint(32);
+    
+    ;; Increase credit score based on revenue (1 point per 1 TON revenue)
+    int credit_boost = revenue_amount / 1000000000; ;; 1 TON = 1 credit point
+    int new_credit_score = credit_score + credit_boost;
+    if (new_credit_score > 2000) {
+        new_credit_score = 2000;
+    }
+    
+    cell updated_profile = begin_cell()
+        .store_grams(current_balance + revenue_amount)
+        .store_grams(staked_amount)
+        .store_uint(new_credit_score, 16)
+        .store_uint(active_loans, 16)
+        .store_grams(total_revenue + revenue_amount)
+        .store_uint(now(), 32)
+        .end_cell();
+    
+    economic_profiles~udict_set(64, agent_id, updated_profile);
+    save_data(economic_profiles, registry_contract, loan_registry);
+}
+
+;; Get agent economic profile
+(int, int, int, int, int, int) get_economic_profile(int agent_id) method_id {
+    (cell economic_profiles, slice registry_contract, cell loan_registry) = load_data();
+    
+    (cell profile, int found) = economic_profiles.udict_get?(64, agent_id);
+    throw_unless(404, found);
+    
+    slice profile_data = profile.begin_parse();
+    int balance = profile_data~load_grams();
+    int staked_amount = profile_data~load_grams();
+    int credit_score = profile_data~load_uint(16);
+    int active_loans = profile_data~load_uint(16);
+    int total_revenue = profile_data~load_grams();
+    int last_activity = profile_data~load_uint(32);
+    
+    return (balance, staked_amount, credit_score, active_loans, total_revenue, last_activity);
+}
+
+;; Calculate loan eligibility
+(int, int) calculate_loan_eligibility(int agent_id) method_id {
+    (cell economic_profiles, slice registry_contract, cell loan_registry) = load_data();
+    
+    (cell profile, int found) = economic_profiles.udict_get?(64, agent_id);
+    throw_unless(404, found);
+    
+    slice profile_data = profile.begin_parse();
+    profile_data~load_grams(); ;; skip balance
+    int staked_amount = profile_data~load_grams();
+    int credit_score = profile_data~load_uint(16);
+    
+    if (credit_score < CREDIT_SCORE_THRESHOLD) {
+        return (0, credit_score); ;; Not eligible
+    }
+    
+    int max_loan = (staked_amount * credit_score) / 1000;
+    return (max_loan, credit_score);
+}
+
+;; Main message handler
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { 
+        return ();
+    }
+    
+    int op = in_msg_body~load_uint(32);
+    
+    if (op == 0x496e6974) { ;; "Init" - Initialize Profile
+        int agent_id = in_msg_body~load_uint(64);
+        initialize_profile(agent_id);
+        return ();
+    }
+    
+    if (op == 0x44657073) { ;; "Deps" - Deposit
+        int agent_id = in_msg_body~load_uint(64);
+        deposit_funds(agent_id);
+        return ();
+    }
+    
+    if (op == 0x53746b65) { ;; "Stke" - Stake
+        int agent_id = in_msg_body~load_uint(64);
+        int stake_amount = in_msg_body~load_grams();
+        stake_funds(agent_id, stake_amount);
+        return ();
+    }
+    
+    if (op == 0x4c6f616e) { ;; "Loan" - Request Loan
+        int agent_id = in_msg_body~load_uint(64);
+        int loan_amount = in_msg_body~load_grams();
+        int duration = in_msg_body~load_uint(32);
+        request_loan(agent_id, loan_amount, duration);
+        return ();
+    }
+    
+    if (op == 0x52657665) { ;; "Reve" - Record Revenue
+        int agent_id = in_msg_body~load_uint(64);
+        int revenue_amount = in_msg_body~load_grams();
+        record_revenue(agent_id, revenue_amount);
+        return ();
+    }
+    
+    throw(0xffff);
+}
