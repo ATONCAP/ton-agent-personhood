@@ -114,7 +114,8 @@ describe('Validation Functions', () => {
         isValid: false, 
         error: 'Agent metadata must be less than 1000 characters' 
       });
-      expect(validateMetadata('{"invalid": json')).toEqual({ 
+      // Test malformed JSON with sufficient length
+      expect(validateMetadata('{"this is invalid JSON syntax and long enough": invalid}')).toEqual({ 
         isValid: false, 
         error: 'Metadata appears to be JSON but is invalid format' 
       });

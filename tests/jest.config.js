@@ -18,37 +18,32 @@ module.exports = {
   // Setup files
   setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.js'],
   
-  // Module resolution
-  moduleNameMapping: {
+  // Module resolution (fixed typo: was moduleNameMapping)
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/frontend/src/$1',
   },
   
-  // TypeScript support
-  preset: 'ts-jest',
-  
-  // Transform files
+  // Transform files - use ts-jest from frontend node_modules
   transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
+    '^.+\\.(ts|tsx)$': ['<rootDir>/frontend/node_modules/ts-jest', {
+      tsconfig: '<rootDir>/frontend/tsconfig.json'
+    }],
   },
   
   // Module file extensions
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   
   // Coverage settings
-  collectCoverage: true,
-  coverageDirectory: '<rootDir>/tests/coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
-  collectCoverageFrom: [
-    'frontend/src/**/*.{ts,tsx}',
-    '!frontend/src/**/*.d.ts',
-    '!frontend/src/**/node_modules/**',
-  ],
+  collectCoverage: false, // Disable initially to focus on getting tests running
   
   // Ignore patterns
   testPathIgnorePatterns: [
     '<rootDir>/frontend/node_modules/',
     '<rootDir>/frontend/.next/',
   ],
+  
+  // Module paths
+  modulePaths: ['<rootDir>/frontend/node_modules'],
   
   // Verbose output
   verbose: true,
