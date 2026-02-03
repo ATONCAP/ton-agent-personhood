@@ -2,9 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  experimental: {
-    appDir: false,
-  },
+  // Removed deprecated appDir experimental option
 }
 
 module.exports = nextConfig

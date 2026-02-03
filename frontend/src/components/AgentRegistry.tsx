@@ -9,7 +9,7 @@ export function AgentRegistry() {
   const [agentName, setAgentName] = useState('');
   const [verificationData, setVerificationData] = useState('');
   const [metadata, setMetadata] = useState('');
-  const [isRegistering, setIsRegistering] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
   const wallet = useTonWallet();

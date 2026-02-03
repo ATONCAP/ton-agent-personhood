@@ -133,8 +133,8 @@ export function validateTONAddress(address: string): ValidationResult {
   return { isValid: true };
 }
 
-// Form validation helper - FIXED TypeScript constraint
-export function validateForm<T extends Record<string, any>>(
+// Form validation helper
+export function validateForm<T>(
   data: T, 
   validators: { [K in keyof T]?: (value: T[K]) => ValidationResult }
 ): { isValid: boolean; errors: { [K in keyof T]?: string } } {
