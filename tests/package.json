@@ -1,0 +1,21 @@
+{
+  "name": "ton-agent-personhood-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Real tests for TON Agentic Personhood (no fake test results!)",
+  "scripts": {
+    "test": "jest --config=jest.config.js",
+    "test:watch": "jest --config=jest.config.js --watch",
+    "test:coverage": "jest --config=jest.config.js --coverage",
+    "test:validation": "jest --config=jest.config.js --testNamePattern='validation'",
+    "install": "echo '⚠️  Run npm install in parent directory, not here'"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0"
+  },
+  "keywords": ["ton", "agent", "personhood", "testing", "real-tests"],
+  "author": "AlphaTON Capital",
+  "license": "MIT"
+}

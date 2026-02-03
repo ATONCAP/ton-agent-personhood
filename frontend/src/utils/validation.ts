@@ -154,3 +154,70 @@ export function validateForm<T extends Record<string, any>>(
   
   return { isValid, errors };
 }
+
+// Additional validation functions for better UX
+export function validateMetadata(metadata: string): ValidationResult {
+  if (!metadata || typeof metadata !== 'string') {
+    return { isValid: false, error: 'Agent metadata is required' };
+  }
+
+  const trimmed = metadata.trim();
+
+  if (trimmed.length < 20) {
+    return { isValid: false, error: 'Agent metadata must be at least 20 characters' };
+  }
+
+  if (trimmed.length > 1000) {
+    return { isValid: false, error: 'Agent metadata must be less than 1000 characters' };
+  }
+
+  // Try to parse as JSON if it looks like JSON
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      JSON.parse(trimmed);
+    } catch {
+      return { isValid: false, error: 'Metadata appears to be JSON but is invalid format' };
+    }
+  }
+
+  return { isValid: true };
+}
+
+export function validateVerificationData(data: string): ValidationResult {
+  if (!data || typeof data !== 'string') {
+    return { isValid: false, error: 'Verification data is required' };
+  }
+
+  const trimmed = data.trim();
+
+  // Basic validation - in reality this would check cryptographic signatures
+  if (trimmed.length < 10) {
+    return { isValid: false, error: 'Verification data too short' };
+  }
+
+  if (trimmed.length > 500) {
+    return { isValid: false, error: 'Verification data too long' };
+  }
+
+  return { isValid: true };
+}
+
+// Better TON address validation (still TODO for full implementation)
+export function validateTONAddressAdvanced(address: string): ValidationResult {
+  const basicResult = validateTONAddress(address);
+  if (!basicResult.isValid) return basicResult;
+
+  // TODO: Add checksum validation
+  // TODO: Add network validation (mainnet vs testnet)
+  // TODO: Add smart contract detection
+
+  return { isValid: true };
+}
+
+export function sanitizeInput(input: string, maxLength: number = 1000): string {
+  return input
+    .trim()
+    .slice(0, maxLength)
+    .replace(/[<>]/g, '') // Basic XSS prevention
+    .replace(/\x00/g, ''); // Remove null bytes
+}

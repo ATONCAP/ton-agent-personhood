@@ -1,151 +1,190 @@
 // TODO: REAL CONTRACT INTEGRATION NEEDED
-// Current implementation is mock data - needs actual TON contract calls
+// This service currently returns mock data until contracts are deployed
 
-export interface Agent {
-  id: number;
-  name: string;
+export interface AgentInfo {
   address: string;
+  name: string;
+  owner: string;
   reputation: number;
-  verified: boolean;
-  creationTime: string;
+  isActive: boolean;
+  metadata: string;
+  registrationDate: number;
 }
 
 export interface EconomicProfile {
-  balance: string;
-  stakedAmount: string;
+  stakedTokens: number;
+  borrowingPower: number;
+  outstandingLoans: number;
   creditScore: number;
-  activeLoans: number;
-  totalRevenue: string;
-  lastActivity: string;
+  collateralRatio: number;
+  totalEarnings: number;
 }
 
-export class ContractService {
-  private isConnected = false;
-  
+class ContractService {
+  private isInitialized = false;
+  private mockDataWarningShown = false;
+
   // TODO: Replace with actual contract addresses once deployed
-  private readonly REGISTRY_ADDRESS = "DEPLOYMENT_PENDING";
-  private readonly ECONOMICS_ADDRESS = "DEPLOYMENT_PENDING";  
-  private readonly GOVERNANCE_ADDRESS = "DEPLOYMENT_PENDING";
-  
-  constructor() {
-    console.warn("⚠️ ContractService: Using mock data - contracts not deployed yet");
-  }
-  
-  async registerAgent(name: string, verificationData: string, metadata: string): Promise<{ success: boolean; error?: string; agentId?: number }> {
-    // TODO: Replace with actual contract call
-    console.warn("🔴 MOCK: registerAgent() - not calling real contract");
-    
-    try {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // TODO: Create actual transaction to registry contract
-      // const transaction = await this.buildRegisterTransaction(name, verificationData, metadata);
-      // const result = await this.sendTransaction(transaction);
-      
-      // Mock successful registration
-      return {
-        success: true,
-        agentId: Math.floor(Math.random() * 10000)
-      };
-      
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Registration failed'
-      };
+  private readonly CONTRACT_ADDRESSES = {
+    AGENT_REGISTRY: 'EQ...',
+    ECONOMIC_INFRA: 'EQ...',
+    GOVERNANCE: 'EQ...',
+  };
+
+  private showMockWarning(method: string) {
+    if (!this.mockDataWarningShown) {
+      console.warn("⚠️ ContractService: Using mock data - contracts not deployed yet");
+      this.mockDataWarningShown = true;
     }
   }
-  
-  async getAgentInfo(agentId: number): Promise<Agent | null> {
-    // TODO: Replace with actual contract call
-    console.warn("🔴 MOCK: getAgentInfo() - not calling real contract");
+
+  async registerAgent(name: string, metadata: string): Promise<{ success: boolean; txHash?: string }> {
+    this.showMockWarning('registerAgent');
     
-    // Mock agent data
-    return {
-      id: agentId,
-      name: `MockAgent${agentId}`,
-      address: `EQC...mock${agentId}`,
-      reputation: Math.floor(Math.random() * 2000),
-      verified: Math.random() > 0.5,
-      creationTime: new Date().toISOString().split('T')[0]
+    // TODO: Replace with actual contract call
+    // Example real implementation:
+    // const cell = beginCell()
+    //   .storeUint(0x12345678, 32) // op code for registration
+    //   .storeStringRefTail(name)
+    //   .storeStringRefTail(metadata)
+    //   .endCell();
+    // 
+    // const transaction = {
+    //   to: this.CONTRACT_ADDRESSES.AGENT_REGISTRY,
+    //   value: toNano('0.1'), // registration fee
+    //   body: cell
+    // };
+    // 
+    // return await tonConnectUI.sendTransaction(transaction);
+
+    // Mock success response
+    return { 
+      success: true, 
+      txHash: `mock_tx_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` 
     };
   }
-  
-  async getAllAgents(): Promise<Agent[]> {
-    // TODO: Replace with actual contract call
-    console.warn("🔴 MOCK: getAllAgents() - not calling real contract");
+
+  async getAgentInfo(address: string): Promise<AgentInfo | null> {
+    this.showMockWarning('getAgentInfo');
     
-    // Return mock data array
-    return [
+    // TODO: Replace with actual contract call
+    const mockAgents: AgentInfo[] = [
       {
-        id: 1,
-        name: 'Aton',
-        address: 'EQC...abc123',
-        reputation: 1850,
-        verified: true,
-        creationTime: '2026-01-15'
+        address: 'EQ..._mock1',
+        name: 'Alpha Assistant',
+        owner: 'EQ..._owner1', 
+        reputation: 850,
+        isActive: true,
+        metadata: JSON.stringify({ type: 'assistant', capabilities: ['trading', 'analysis'] }),
+        registrationDate: Date.now() - 86400000 // 1 day ago
       },
       {
-        id: 2,
-        name: 'MockAgent2',
-        address: 'EQC...def456',
-        reputation: 1200,
-        verified: false,
-        creationTime: '2026-02-01'
+        address: 'EQ..._mock2',
+        name: 'Beta Bot',
+        owner: 'EQ..._owner2',
+        reputation: 720,
+        isActive: true,
+        metadata: JSON.stringify({ type: 'trader', specialization: 'DeFi' }),
+        registrationDate: Date.now() - 172800000 // 2 days ago
+      }
+    ];
+
+    return mockAgents.find(agent => agent.address === address) || null;
+  }
+
+  async getAllAgents(): Promise<AgentInfo[]> {
+    this.showMockWarning('getAllAgents');
+    
+    // TODO: Replace with actual contract call
+    return [
+      {
+        address: 'EQ..._mock1',
+        name: 'Alpha Assistant',
+        owner: 'EQ..._owner1',
+        reputation: 850,
+        isActive: true,
+        metadata: JSON.stringify({ type: 'assistant', capabilities: ['trading', 'analysis'] }),
+        registrationDate: Date.now() - 86400000
+      },
+      {
+        address: 'EQ..._mock2', 
+        name: 'Beta Bot',
+        owner: 'EQ..._owner2',
+        reputation: 720,
+        isActive: true,
+        metadata: JSON.stringify({ type: 'trader', specialization: 'DeFi' }),
+        registrationDate: Date.now() - 172800000
+      },
+      {
+        address: 'EQ..._mock3',
+        name: 'Gamma Guardian',
+        owner: 'EQ..._owner3',
+        reputation: 950,
+        isActive: false,
+        metadata: JSON.stringify({ type: 'security', focus: 'smart_contract_audit' }),
+        registrationDate: Date.now() - 259200000 // 3 days ago
       }
     ];
   }
-  
-  async getEconomicProfile(agentId: number): Promise<EconomicProfile | null> {
-    // TODO: Replace with actual contract call
-    console.warn("🔴 MOCK: getEconomicProfile() - not calling real contract");
+
+  async getEconomicProfile(agentAddress: string): Promise<EconomicProfile> {
+    this.showMockWarning('getEconomicProfile');
     
-    return {
-      balance: (Math.random() * 100).toFixed(2),
-      stakedAmount: (Math.random() * 50).toFixed(2),
-      creditScore: Math.floor(Math.random() * 2000),
-      activeLoans: Math.floor(Math.random() * 5),
-      totalRevenue: (Math.random() * 1000).toFixed(2),
-      lastActivity: new Date().toISOString().split('T')[0]
+    // TODO: Replace with actual contract call
+    const mockProfiles: Record<string, EconomicProfile> = {
+      'EQ..._mock1': {
+        stakedTokens: 1250.5,
+        borrowingPower: 625.25,
+        outstandingLoans: 0,
+        creditScore: 850,
+        collateralRatio: 2.0,
+        totalEarnings: 340.75
+      },
+      'EQ..._mock2': {
+        stakedTokens: 890.0,
+        borrowingPower: 445.0,
+        outstandingLoans: 150.0,
+        creditScore: 720,
+        collateralRatio: 1.8,
+        totalEarnings: 220.30
+      }
+    };
+
+    return mockProfiles[agentAddress] || {
+      stakedTokens: 0,
+      borrowingPower: 0,
+      outstandingLoans: 0,
+      creditScore: 500,
+      collateralRatio: 0,
+      totalEarnings: 0
     };
   }
-  
-  async stakeTokens(agentId: number, amount: string): Promise<{ success: boolean; error?: string }> {
-    // TODO: Replace with actual contract call
-    console.warn("🔴 MOCK: stakeTokens() - not calling real contract");
+
+  async stakeTokens(amount: number): Promise<{ success: boolean; txHash?: string }> {
+    this.showMockWarning('stakeTokens');
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return { success: true };
-  }
-  
-  async requestLoan(agentId: number, amount: string, duration: number): Promise<{ success: boolean; error?: string }> {
     // TODO: Replace with actual contract call
-    console.warn("🔴 MOCK: requestLoan() - not calling real contract");
+    return { success: true, txHash: `mock_stake_${Date.now()}` };
+  }
+
+  async requestLoan(amount: number, collateral: number): Promise<{ success: boolean; txHash?: string }> {
+    this.showMockWarning('requestLoan');
     
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return { success: true };
+    // TODO: Replace with actual contract call
+    return { success: true, txHash: `mock_loan_${Date.now()}` };
   }
-  
-  // TODO: Add methods for:
-  // - createProposal()
-  // - voteOnProposal()
-  // - getProposals()
-  // - getVotingPower()
-  
-  getContractAddresses() {
-    return {
-      registry: this.REGISTRY_ADDRESS,
-      economics: this.ECONOMICS_ADDRESS,
-      governance: this.GOVERNANCE_ADDRESS,
-      deployed: false
-    };
-  }
-  
-  isReady(): boolean {
+
+  isConnected(): boolean {
     // TODO: Return true once contracts are deployed and connected
-    return false;
+    return false;  // Always false until real contracts
   }
+
+  // TODO: Add methods for:
+  // - updateAgentMetadata()
+  // - vote() for governance
+  // - getProposals()
+  // - claimRewards()
+  // - transferAgentOwnership()
 }
 
 export const contractService = new ContractService();

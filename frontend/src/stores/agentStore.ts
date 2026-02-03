@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { contractService, Agent, EconomicProfile } from '../services/contractService';
+import { contractService, AgentInfo, EconomicProfile } from '../services/contractService';
 
 interface Proposal {
   id: number;
@@ -11,6 +11,11 @@ interface Proposal {
   status: 'active' | 'passed' | 'failed';
   deadline: string;
   type: string;
+}
+
+// Use AgentInfo from contractService for consistency
+interface Agent extends AgentInfo {
+  id?: number; // Optional for backward compatibility
 }
 
 interface AgentState {
@@ -26,6 +31,7 @@ interface AgentState {
   
   // Contract status
   contractsReady: boolean;
+  mockWarningsEnabled: boolean;
   
   // Actions
   setAgents: (agents: Agent[]) => void;
@@ -33,7 +39,8 @@ interface AgentState {
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   addAgent: (agent: Agent) => void;
-  updateAgent: (id: number, updates: Partial<Agent>) => void;
+  updateAgent: (address: string, updates: Partial<Agent>) => void;
+  toggleMockWarnings: () => void;
   
   // Governance actions
   setProposals: (proposals: Proposal[]) => void;
@@ -42,12 +49,12 @@ interface AgentState {
   setVotingPower: (power: number) => void;
   
   // Contract interactions (CURRENTLY MOCKED)
-  registerAgent: (name: string, verificationData: string, metadata: string) => Promise<void>;
-  stakeTokens: (agentId: number, amount: string) => Promise<void>;
-  requestLoan: (agentId: number, amount: string, duration: number) => Promise<void>;
+  registerAgent: (name: string, metadata: string) => Promise<void>;
+  stakeTokens: (amount: number) => Promise<void>;
+  requestLoan: (amount: number, collateral: number) => Promise<void>;
   createProposal: (title: string, description: string, type: string) => Promise<void>;
   loadAgents: () => Promise<void>;
-  loadEconomicProfile: (agentId: number) => Promise<EconomicProfile | null>;
+  loadEconomicProfile: (agentAddress: string) => Promise<EconomicProfile | null>;
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
@@ -58,21 +65,23 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   error: null,
   proposals: [],
   votingPower: 1000,
-  contractsReady: contractService.isReady(),
+  contractsReady: contractService.isConnected(),
+  mockWarningsEnabled: false, // Reduced noise
   
   // Basic setters
   setAgents: (agents) => set({ agents }),
   setCurrentAgent: (agent) => set({ currentAgent: agent }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
+  toggleMockWarnings: () => set((state) => ({ mockWarningsEnabled: !state.mockWarningsEnabled })),
   
   addAgent: (agent) => set((state) => ({
     agents: [...state.agents, agent]
   })),
   
-  updateAgent: (id, updates) => set((state) => ({
+  updateAgent: (address, updates) => set((state) => ({
     agents: state.agents.map(agent => 
-      agent.id === id ? { ...agent, ...updates } : agent
+      agent.address === address ? { ...agent, ...updates } : agent
     )
   })),
   
@@ -97,28 +106,32 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   
   setVotingPower: (power) => set({ votingPower: power }),
   
-  // Contract interactions - EXPLICITLY MARKED AS MOCKED
-  registerAgent: async (name, verificationData, metadata) => {
+  // Contract interactions - MOCK IMPLEMENTATIONS
+  registerAgent: async (name: string, metadata: string) => {
+    const { mockWarningsEnabled } = get();
     set({ loading: true, error: null });
     
     try {
-      console.log('🔴 USING MOCK CONTRACT SERVICE');
-      const result = await contractService.registerAgent(name, verificationData, metadata);
+      if (mockWarningsEnabled) console.log('🔴 MOCK: registerAgent()');
+      
+      const result = await contractService.registerAgent(name, metadata);
       
       if (result.success) {
+        // Create mock agent data
         const newAgent: Agent = {
-          id: result.agentId!,
+          address: 'EQC_' + Math.random().toString(36).substr(2, 9),
           name,
-          address: 'EQC...' + Math.random().toString(36).substr(2, 9),
+          owner: 'EQOwner_' + Math.random().toString(36).substr(2, 6),
           reputation: 1000,
-          verified: false,
-          creationTime: new Date().toISOString().split('T')[0]
+          isActive: true,
+          metadata,
+          registrationDate: Date.now()
         };
         
         get().addAgent(newAgent);
         set({ currentAgent: newAgent });
       } else {
-        throw new Error(result.error || 'Registration failed');
+        throw new Error('Registration failed');
       }
       
     } catch (error) {
@@ -129,18 +142,18 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     }
   },
   
-  stakeTokens: async (agentId, amount) => {
+  stakeTokens: async (amount: number) => {
+    const { mockWarningsEnabled } = get();
     set({ loading: true, error: null });
     
     try {
-      console.log('🔴 USING MOCK CONTRACT SERVICE');
-      const result = await contractService.stakeTokens(agentId, amount);
+      if (mockWarningsEnabled) console.log('🔴 MOCK: stakeTokens()');
+      
+      const result = await contractService.stakeTokens(amount);
       
       if (!result.success) {
-        throw new Error(result.error || 'Staking failed');
+        throw new Error('Staking failed');
       }
-      
-      // Mock update of agent's profile would go here
       
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Staking failed' });
@@ -150,15 +163,17 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     }
   },
   
-  requestLoan: async (agentId, amount, duration) => {
+  requestLoan: async (amount: number, collateral: number) => {
+    const { mockWarningsEnabled } = get();
     set({ loading: true, error: null });
     
     try {
-      console.log('🔴 USING MOCK CONTRACT SERVICE');
-      const result = await contractService.requestLoan(agentId, amount, duration);
+      if (mockWarningsEnabled) console.log('🔴 MOCK: requestLoan()');
+      
+      const result = await contractService.requestLoan(amount, collateral);
       
       if (!result.success) {
-        throw new Error(result.error || 'Loan request failed');
+        throw new Error('Loan request failed');
       }
       
     } catch (error) {
@@ -169,14 +184,15 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     }
   },
   
-  createProposal: async (title, description, type) => {
+  createProposal: async (title: string, description: string, type: string) => {
+    const { mockWarningsEnabled } = get();
     set({ loading: true, error: null });
     
     try {
       // TODO: Use contractService.createProposal() when implemented
-      console.log('🔴 MOCK: Creating proposal:', { title, description, type });
+      if (mockWarningsEnabled) console.log('🔴 MOCK: Creating proposal:', { title, description, type });
       
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
       
       const newProposal: Proposal = {
         id: Date.now(),
@@ -201,10 +217,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   },
   
   loadAgents: async () => {
+    const { mockWarningsEnabled } = get();
     set({ loading: true, error: null });
     
     try {
-      console.log('🔴 USING MOCK CONTRACT SERVICE');
+      if (mockWarningsEnabled) console.log('🔴 MOCK: loadAgents()');
+      
       const agents = await contractService.getAllAgents();
       set({ agents });
       
@@ -215,10 +233,12 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     }
   },
   
-  loadEconomicProfile: async (agentId: number) => {
+  loadEconomicProfile: async (agentAddress: string) => {
+    const { mockWarningsEnabled } = get();
+    
     try {
-      console.log('🔴 USING MOCK CONTRACT SERVICE');
-      return await contractService.getEconomicProfile(agentId);
+      if (mockWarningsEnabled) console.log('🔴 MOCK: loadEconomicProfile()');
+      return await contractService.getEconomicProfile(agentAddress);
     } catch (error) {
       console.error('Failed to load economic profile:', error);
       return null;
